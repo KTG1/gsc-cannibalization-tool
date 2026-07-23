@@ -2,6 +2,8 @@
 
 A private, browser-only Google Search Console homepage cannibalization finder. It identifies queries receiving impressions for both a site's homepage and its sub-pages, ranked by mutual impressions.
 
+Results can be explored as a hoverable query map or a detailed table. The common impression percentage is a symmetric overlap score: `2 × mutual impressions ÷ combined impressions`.
+
 ## Google setup
 
 1. In Google Cloud Console, enable **Google Search Console API**.

@@ -118,6 +118,7 @@ function analyze(rows, homepage, threshold) {
         query, homepage, subpage, homepageImpressions: record.home,
         pageImpressions, mutual, total: record.home + pageImpressions,
         homepageShare: record.home / (record.home + pageImpressions),
+        commonPercentage: (2 * mutual) / (record.home + pageImpressions),
       });
     }
   }
@@ -129,11 +130,80 @@ function render() {
   $("resultsBody").innerHTML = results.map((row) => `<tr>
     <td>${escapeHtml(row.query)}</td><td>${escapeHtml(row.subpage)}</td>
     <td>${row.homepageImpressions.toLocaleString()}</td><td>${row.pageImpressions.toLocaleString()}</td>
-    <td>${row.mutual.toLocaleString()}</td><td>${(row.homepageShare * 100).toFixed(1)}%</td>
+    <td>${row.mutual.toLocaleString()}</td><td>${(row.commonPercentage * 100).toFixed(1)}%</td><td>${(row.homepageShare * 100).toFixed(1)}%</td>
   </tr>`).join("");
+  renderMap();
   $("emptyState").hidden = true;
   $("report").hidden = false;
 }
+
+function renderMap() {
+  const visible = results.slice(0, 80);
+  const maxMutual = Math.max(...visible.map((row) => row.mutual), 1);
+  $("queryMap").innerHTML = visible.map((row, index) => {
+    const size = 12 + Math.sqrt(row.mutual / maxMutual) * 25;
+    const x = 6 + (1 - row.homepageShare) * 88;
+    const lane = index % 10;
+    const band = Math.floor(index / 10);
+    const jitter = ((hashString(`${row.query}|${row.subpage}`) % 13) - 6) * 0.45;
+    const y = 7 + lane * 9.5 + (band % 2 ? 2.4 : 0) + jitter;
+    const score = Math.round(row.commonPercentage * 100);
+    return `<button class="query-point" style="--x:${x}%;--y:${Math.min(96, Math.max(4, y))}%;--size:${size}px;--score:${score}%" data-index="${index}" aria-label="${escapeHtml(row.query)}, ${score}% common impressions"></button>`;
+  }).join("");
+  document.querySelectorAll(".query-point").forEach((point) => {
+    point.addEventListener("pointerenter", showTooltip);
+    point.addEventListener("pointermove", moveTooltip);
+    point.addEventListener("pointerleave", hideTooltip);
+    point.addEventListener("focus", showTooltip);
+    point.addEventListener("blur", hideTooltip);
+  });
+}
+
+function hashString(value) {
+  let hash = 0;
+  for (let i = 0; i < value.length; i += 1) hash = ((hash << 5) - hash + value.charCodeAt(i)) | 0;
+  return Math.abs(hash);
+}
+
+function showTooltip(event) {
+  const row = results[Number(event.currentTarget.dataset.index)];
+  const tooltip = $("mapTooltip");
+  tooltip.innerHTML = `<strong>${escapeHtml(row.query)}</strong><dl>
+    <dt>Common impression score</dt><dd class="common">${(row.commonPercentage * 100).toFixed(1)}%</dd>
+    <dt>Homepage impressions</dt><dd>${row.homepageImpressions.toLocaleString()}</dd>
+    <dt>Sub-page impressions</dt><dd>${row.pageImpressions.toLocaleString()}</dd>
+    <dt>Mutual impressions</dt><dd>${row.mutual.toLocaleString()}</dd>
+    <dt>Sub-page</dt><dd>${escapeHtml(shortUrl(row.subpage))}</dd>
+  </dl>`;
+  tooltip.hidden = false;
+  moveTooltip(event);
+}
+
+function moveTooltip(event) {
+  const tooltip = $("mapTooltip");
+  const source = event.pointerType ? { x: event.clientX, y: event.clientY } : event.currentTarget.getBoundingClientRect();
+  const x = source.x ?? source.left;
+  const y = source.y ?? source.bottom;
+  const left = Math.min(window.innerWidth - tooltip.offsetWidth - 12, Math.max(12, x + 16));
+  const top = Math.min(window.innerHeight - tooltip.offsetHeight - 12, Math.max(12, y + 16));
+  tooltip.style.left = `${left}px`; tooltip.style.top = `${top}px`;
+}
+
+function hideTooltip() { $("mapTooltip").hidden = true; }
+function shortUrl(value) { try { const url = new URL(value); return `${url.host}${url.pathname}`; } catch { return value; } }
+
+document.querySelectorAll(".view-button").forEach((button) => {
+  button.addEventListener("click", () => {
+    const showMap = button.dataset.view === "map";
+    $("mapView").hidden = !showMap;
+    $("tableView").hidden = showMap;
+    document.querySelectorAll(".view-button").forEach((item) => {
+      const active = item === button;
+      item.classList.toggle("active", active);
+      item.setAttribute("aria-pressed", String(active));
+    });
+  });
+});
 
 function escapeHtml(value) {
   const node = document.createElement("div"); node.textContent = value; return node.innerHTML;
@@ -153,9 +223,9 @@ $("analyzeButton").addEventListener("click", async () => {
 });
 
 $("downloadButton").addEventListener("click", () => {
-  const header = ["query","homepage","subpage","homepage_impressions","subpage_impressions","mutual_impressions","total_impressions","homepage_share"];
+  const header = ["query","homepage","subpage","homepage_impressions","subpage_impressions","mutual_impressions","common_impression_percentage","total_impressions","homepage_share"];
   const quote = (value) => `"${String(value).replaceAll('"', '""')}"`;
-  const lines = results.map((r) => [r.query,r.homepage,r.subpage,r.homepageImpressions,r.pageImpressions,r.mutual,r.total,r.homepageShare.toFixed(4)].map(quote).join(","));
+  const lines = results.map((r) => [r.query,r.homepage,r.subpage,r.homepageImpressions,r.pageImpressions,r.mutual,(r.commonPercentage * 100).toFixed(2),r.total,r.homepageShare.toFixed(4)].map(quote).join(","));
   const blob = new Blob([[header.join(","), ...lines].join("\n")], { type: "text/csv;charset=utf-8" });
   const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = "homepage-cannibalization.csv"; link.click();
   URL.revokeObjectURL(link.href);

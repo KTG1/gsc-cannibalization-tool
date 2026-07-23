@@ -90,6 +90,9 @@ def analyze(rows, homepage: str, min_mutual_impressions: float):
                         "homepage_impressions": round(home_impressions, 2),
                         "subpage_impressions": round(page_impressions, 2),
                         "mutual_impressions": round(mutual, 2),
+                        "common_impression_percentage": round(
+                            200 * mutual / (home_impressions + page_impressions), 2
+                        ),
                         "total_impressions": round(home_impressions + page_impressions, 2),
                         "homepage_share": round(
                             home_impressions / (home_impressions + page_impressions), 4
@@ -121,7 +124,7 @@ def main():
 
     fields = [
         "query", "homepage", "subpage", "homepage_impressions",
-        "subpage_impressions", "mutual_impressions", "total_impressions",
+        "subpage_impressions", "mutual_impressions", "common_impression_percentage", "total_impressions",
         "homepage_share",
     ]
     with open(args.output, "w", newline="", encoding="utf-8") as handle:
