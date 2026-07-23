@@ -6,6 +6,7 @@ let accessToken = "";
 let results = [];
 let isExample = true;
 let activeCheck = "homepage";
+let pinnedPoint = null;
 
 const checkTemplates = {
   homepage: { hint: "Queries shared by the homepage and any sub-page.", primary: "Homepage", secondary: "Sub-page" },
@@ -194,6 +195,8 @@ function render() {
   $("sampleBadge").hidden = !isExample;
   $("primaryAxis").textContent = `${labels.primary} leads`;
   $("secondaryAxis").textContent = `${labels.secondary} leads`;
+  $("scatterYLabel").textContent = `${labels.secondary} impressions ↑`;
+  $("scatterXLabel").textContent = `${labels.primary} impressions →`;
   $("secondaryPageHead").textContent = labels.secondary;
   $("primaryImpHead").textContent = `${labels.primary} imp.`;
   $("secondaryImpHead").textContent = `${labels.secondary} imp.`;
@@ -205,6 +208,7 @@ function render() {
     <td>${row.mutual.toLocaleString()}</td><td>${(row.commonPercentage * 100).toFixed(1)}%</td><td>${(row.homepageShare * 100).toFixed(1)}%</td>
   </tr>`).join("");
   renderMap();
+  renderScatter();
   $("emptyState").hidden = true;
   $("report").hidden = false;
 }
@@ -212,7 +216,7 @@ function render() {
 function renderMap() {
   const visible = results.slice(0, 80);
   const maxMutual = Math.max(...visible.map((row) => row.mutual), 1);
-  $("queryMap").innerHTML = visible.map((row, index) => {
+  $("queryMap").innerHTML = visible.length ? visible.map((row, index) => {
     const size = 12 + Math.sqrt(row.mutual / maxMutual) * 25;
     const x = 6 + (1 - row.homepageShare) * 88;
     const lane = index % 10;
@@ -221,13 +225,33 @@ function renderMap() {
     const y = 7 + lane * 9.5 + (band % 2 ? 2.4 : 0) + jitter;
     const score = Math.round(row.commonPercentage * 100);
     return `<button class="query-point" style="--x:${x}%;--y:${Math.min(96, Math.max(4, y))}%;--size:${size}px;--score:${score}%" data-index="${index}" aria-label="${escapeHtml(row.query)}, ${score}% common impressions"></button>`;
-  }).join("");
-  document.querySelectorAll(".query-point").forEach((point) => {
+  }).join("") : '<p class="empty-result">No collisions meet the current template and threshold.</p>';
+  bindPoints(".query-point");
+}
+
+function renderScatter() {
+  const visible = results.slice(0, 250);
+  const maxImpressions = Math.max(...visible.flatMap((row) => [row.homepageImpressions, row.pageImpressions]), 1);
+  const maxLog = Math.log10(maxImpressions + 1);
+  const maxMutual = Math.max(...visible.map((row) => row.mutual), 1);
+  $("scatterPoints").innerHTML = visible.length ? visible.map((row, index) => {
+    const x = 7 + (Math.log10(row.homepageImpressions + 1) / maxLog) * 88;
+    const y = 93 - (Math.log10(row.pageImpressions + 1) / maxLog) * 88;
+    const size = 9 + Math.sqrt(row.mutual / maxMutual) * 22;
+    const score = Math.round(row.commonPercentage * 100);
+    return `<button class="scatter-point" style="--x:${x}%;--y:${y}%;--size:${size}px;--score:${score}%" data-index="${index}" aria-label="${escapeHtml(row.query)}, ${score}% common impressions"></button>`;
+  }).join("") : '<p class="empty-result">No collisions to plot.</p>';
+  bindPoints(".scatter-point");
+}
+
+function bindPoints(selector) {
+  document.querySelectorAll(selector).forEach((point) => {
     point.addEventListener("pointerenter", showTooltip);
     point.addEventListener("pointermove", moveTooltip);
     point.addEventListener("pointerleave", hideTooltip);
     point.addEventListener("focus", showTooltip);
     point.addEventListener("blur", hideTooltip);
+    point.addEventListener("click", pinTooltip);
   });
 }
 
@@ -261,14 +285,30 @@ function moveTooltip(event) {
   tooltip.style.left = `${left}px`; tooltip.style.top = `${top}px`;
 }
 
-function hideTooltip() { $("mapTooltip").hidden = true; }
+function pinTooltip(event) {
+  if (pinnedPoint) pinnedPoint.classList.remove("is-pinned");
+  if (pinnedPoint === event.currentTarget) {
+    pinnedPoint = null;
+    $("mapTooltip").hidden = true;
+    return;
+  }
+  pinnedPoint = event.currentTarget;
+  pinnedPoint.classList.add("is-pinned");
+  showTooltip(event);
+}
+
+function hideTooltip(event) {
+  if (event?.currentTarget === pinnedPoint) return;
+  $("mapTooltip").hidden = true;
+}
 function shortUrl(value) { try { const url = new URL(value); return `${url.host}${url.pathname}`; } catch { return value; } }
 
 document.querySelectorAll(".view-button").forEach((button) => {
   button.addEventListener("click", () => {
-    const showMap = button.dataset.view === "map";
-    $("mapView").hidden = !showMap;
-    $("tableView").hidden = showMap;
+    const view = button.dataset.view;
+    $("mapView").hidden = view !== "map";
+    $("scatterView").hidden = view !== "scatter";
+    $("tableView").hidden = view !== "table";
     document.querySelectorAll(".view-button").forEach((item) => {
       const active = item === button;
       item.classList.toggle("active", active);

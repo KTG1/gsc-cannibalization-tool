@@ -4,6 +4,8 @@ A private, browser-only Google Search Console homepage cannibalization finder. I
 
 Results can be explored as a hoverable query map or a detailed table. The common impression percentage is a symmetric overlap score: `2 × mutual impressions ÷ combined impressions`.
 
+The interactive scatter view plots primary-page and competing-page impressions on a shared logarithmic scale. The diagonal marks equal ownership; points can be hovered or clicked to pin query details.
+
 Check templates include homepage vs sub-pages, overall two-page cannibalization, and queries fragmented across three or more URLs. Analysis displays phase progress and the number of API rows loaded.
 
 ## Google setup

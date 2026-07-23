@@ -84,6 +84,7 @@
             <div class="report-actions">
               <div class="view-switch" aria-label="Results view">
                 <button class="view-button active" data-view="map" aria-pressed="true">Query map</button>
+                <button class="view-button" data-view="scatter" aria-pressed="false">Scatter</button>
                 <button class="view-button" data-view="table" aria-pressed="false">Table</button>
               </div>
               <button id="downloadButton" class="button outline">Download CSV</button>
@@ -93,8 +94,22 @@
             <div class="map-axis"><span id="primaryAxis">Homepage leads</span><b>Impression split</b><span id="secondaryAxis">Sub-page leads</span></div>
             <div id="queryMap" class="query-map" aria-label="Hoverable query collision map"></div>
             <p class="map-note">Point size = mutual impressions · Color = common impression percentage · Showing the top 80 collisions</p>
-            <div id="mapTooltip" class="map-tooltip" role="tooltip" hidden></div>
           </div>
+          <div id="scatterView" class="scatter-view" hidden>
+            <div class="scatter-y-label" id="scatterYLabel">Sub-page impressions ↑</div>
+            <div id="scatterPlot" class="scatter-plot" aria-label="Interactive impression collision scatter chart">
+              <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+                <line class="parity-line" x1="7" y1="93" x2="95" y2="5"></line>
+                <line class="axis-line" x1="7" y1="5" x2="7" y2="93"></line>
+                <line class="axis-line" x1="7" y1="93" x2="95" y2="93"></line>
+              </svg>
+              <span class="parity-label">Equal impressions</span>
+              <div id="scatterPoints"></div>
+            </div>
+            <div class="scatter-x-label" id="scatterXLabel">Homepage impressions →</div>
+            <p class="map-note">Log scale · Point size = mutual impressions · Click a point to pin its details</p>
+          </div>
+          <div id="mapTooltip" class="map-tooltip" role="tooltip" hidden></div>
           <div id="tableView" class="table-wrap" hidden>
             <table>
               <thead><tr><th>Query</th><th id="secondaryPageHead">Sub-page</th><th id="primaryImpHead">Home imp.</th><th id="secondaryImpHead">Page imp.</th><th>Mutual</th><th>Common %</th><th id="primaryShareHead">Home share</th></tr></thead>
