@@ -32,6 +32,11 @@ input:disabled, select:disabled { opacity: .55; }
 .dark { color: white; background: var(--ink); }
 .signal { width: 100%; height: 58px; display: flex; justify-content: space-between; align-items: center; background: var(--signal); font-size: 16px; }
 .signal span { font-size: 24px; }
+.progress-panel { margin-top: 14px; }
+.progress-copy { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 7px; font: 500 10px "IBM Plex Mono", monospace; }
+.progress-copy span { color: var(--muted); }
+.progress-track { height: 10px; overflow: hidden; border: 1px solid var(--ink); background: white; }
+.progress-track i { display: block; width: 0; height: 100%; background: var(--blue); transition: width .25s ease; }
 .outline { background: transparent; }
 .hint { margin: 9px 0 0; color: var(--muted); font-size: 9px; text-transform: none; letter-spacing: .02em; }
 .date-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }

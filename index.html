@@ -41,6 +41,14 @@
           <label for="property">Search Console property</label>
           <select id="property" disabled><option>Connect Google first</option></select>
 
+          <label for="checkType">Check template</label>
+          <select id="checkType">
+            <option value="homepage">Homepage vs sub-pages</option>
+            <option value="overall">Overall cannibalization</option>
+            <option value="fragmentation">3+ page fragmentation</option>
+          </select>
+          <p id="checkHint" class="hint">Queries shared by the homepage and any sub-page.</p>
+
           <label for="homepage">Homepage URL</label>
           <input id="homepage" type="url" placeholder="https://example.com/" disabled>
 
@@ -54,6 +62,10 @@
         </div>
 
         <button id="analyzeButton" class="button signal" disabled>Analyze overlap <span>→</span></button>
+        <div id="progressPanel" class="progress-panel" hidden>
+          <div class="progress-copy"><span id="progressLabel">Preparing…</span><strong id="progressPercent">0%</strong></div>
+          <div class="progress-track" role="progressbar" aria-label="Analysis progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i id="progressFill"></i></div>
+        </div>
         <p id="status" class="status" role="status" aria-live="polite">Waiting for connection.</p>
       </aside>
 
@@ -78,14 +90,14 @@
             </div>
           </div>
           <div id="mapView" class="map-view">
-            <div class="map-axis"><span>Homepage leads</span><b>Impression split</b><span>Sub-page leads</span></div>
+            <div class="map-axis"><span id="primaryAxis">Homepage leads</span><b>Impression split</b><span id="secondaryAxis">Sub-page leads</span></div>
             <div id="queryMap" class="query-map" aria-label="Hoverable query collision map"></div>
             <p class="map-note">Point size = mutual impressions · Color = common impression percentage · Showing the top 80 collisions</p>
             <div id="mapTooltip" class="map-tooltip" role="tooltip" hidden></div>
           </div>
           <div id="tableView" class="table-wrap" hidden>
             <table>
-              <thead><tr><th>Query</th><th>Sub-page</th><th>Home imp.</th><th>Page imp.</th><th>Mutual</th><th>Common %</th><th>Home share</th></tr></thead>
+              <thead><tr><th>Query</th><th id="secondaryPageHead">Sub-page</th><th id="primaryImpHead">Home imp.</th><th id="secondaryImpHead">Page imp.</th><th>Mutual</th><th>Common %</th><th id="primaryShareHead">Home share</th></tr></thead>
               <tbody id="resultsBody"></tbody>
             </table>
           </div>

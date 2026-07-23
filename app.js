@@ -5,6 +5,13 @@ const $ = (id) => document.getElementById(id);
 let accessToken = "";
 let results = [];
 let isExample = true;
+let activeCheck = "homepage";
+
+const checkTemplates = {
+  homepage: { hint: "Queries shared by the homepage and any sub-page.", primary: "Homepage", secondary: "Sub-page" },
+  overall: { hint: "The two strongest URLs competing for each query.", primary: "Leading page", secondary: "Competing page" },
+  fragmentation: { hint: "Queries receiving impressions across three or more URLs.", primary: "Leading page", secondary: "Fragmented page" },
+};
 
 const exampleResults = [
   ["brand running shoes", "/running-shoes/", 1840, 1610],
@@ -40,6 +47,15 @@ function setStatus(message, error = false) {
   $("status").classList.toggle("error", error);
 }
 
+function updateProgress(percent, label) {
+  const value = Math.max(0, Math.min(100, Math.round(percent)));
+  $("progressPanel").hidden = false;
+  $("progressLabel").textContent = label;
+  $("progressPercent").textContent = `${value}%`;
+  $("progressFill").style.width = `${value}%`;
+  $("progressFill").parentElement.setAttribute("aria-valuenow", String(value));
+}
+
 function inferHomepage(siteUrl) {
   if (siteUrl.startsWith("sc-domain:")) return `https://${siteUrl.slice(10).replace(/\/$/, "")}/`;
   const url = new URL(siteUrl);
@@ -71,7 +87,7 @@ async function loadProperties() {
   select.innerHTML = sites.length ? "" : "<option>No verified properties found</option>";
   for (const site of sites) select.add(new Option(site.siteUrl, site.siteUrl));
   select.disabled = !sites.length;
-  $("homepage").disabled = !sites.length;
+  $("homepage").disabled = !sites.length || activeCheck !== "homepage";
   $("analyzeButton").disabled = !sites.length;
   if (sites.length) {
     $("homepage").value = inferHomepage(sites[0].siteUrl);
@@ -101,11 +117,19 @@ $("property").addEventListener("change", (event) => {
   $("homepage").value = inferHomepage(event.target.value);
 });
 $("threshold").addEventListener("input", (event) => { $("thresholdValue").value = event.target.value; });
+$("checkType").addEventListener("change", (event) => {
+  activeCheck = event.target.value;
+  $("checkHint").textContent = checkTemplates[activeCheck].hint;
+  $("homepage").disabled = activeCheck !== "homepage" || $("property").disabled;
+});
 
 async function fetchAllRows(siteUrl) {
   const rows = [];
   let startRow = 0;
+  let pageNumber = 0;
   while (true) {
+    pageNumber += 1;
+    updateProgress(Math.min(68, 18 + pageNumber * 10), `Fetching API page ${pageNumber} · ${startRow.toLocaleString()} rows loaded`);
     setStatus(`Fetching Search Console rows… ${startRow.toLocaleString()} loaded`);
     const body = {
       startDate: $("startDate").value, endDate: $("endDate").value,
@@ -118,37 +142,62 @@ async function fetchAllRows(siteUrl) {
     if (batch.length < 25000) break;
     startRow += batch.length;
   }
+  updateProgress(72, `Fetched ${rows.length.toLocaleString()} rows`);
   return rows;
 }
 
-function analyze(rows, homepage, threshold) {
-  const home = normalizeUrl(homepage);
+function makeResult(query, primaryPage, secondaryPage, primaryImpressions, pageImpressions) {
+  const mutual = Math.min(primaryImpressions, pageImpressions);
+  const total = primaryImpressions + pageImpressions;
+  return {
+    query, homepage: primaryPage, subpage: secondaryPage,
+    homepageImpressions: primaryImpressions, pageImpressions, mutual, total,
+    homepageShare: primaryImpressions / total, commonPercentage: (2 * mutual) / total,
+  };
+}
+
+function analyze(rows, homepage, threshold, checkType) {
+  const home = homepage ? normalizeUrl(homepage) : "";
   const queries = new Map();
   for (const row of rows) {
     const [query, page] = row.keys;
-    if (!queries.has(query)) queries.set(query, { home: 0, pages: new Map() });
-    const record = queries.get(query);
-    if (normalizeUrl(page) === home) record.home += Number(row.impressions || 0);
-    else record.pages.set(page, (record.pages.get(page) || 0) + Number(row.impressions || 0));
+    if (!queries.has(query)) queries.set(query, new Map());
+    const pages = queries.get(query);
+    pages.set(page, (pages.get(page) || 0) + Number(row.impressions || 0));
   }
   const output = [];
-  for (const [query, record] of queries) {
-    if (!record.home) continue;
-    for (const [subpage, pageImpressions] of record.pages) {
-      const mutual = Math.min(record.home, pageImpressions);
-      if (mutual >= threshold) output.push({
-        query, homepage, subpage, homepageImpressions: record.home,
-        pageImpressions, mutual, total: record.home + pageImpressions,
-        homepageShare: record.home / (record.home + pageImpressions),
-        commonPercentage: (2 * mutual) / (record.home + pageImpressions),
-      });
+  for (const [query, pages] of queries) {
+    const ranked = [...pages.entries()].sort((a, b) => b[1] - a[1]);
+    if (checkType === "homepage") {
+      const homeEntry = ranked.find(([page]) => normalizeUrl(page) === home);
+      if (!homeEntry) continue;
+      for (const [page, impressions] of ranked) {
+        if (page === homeEntry[0]) continue;
+        const result = makeResult(query, homeEntry[0], page, homeEntry[1], impressions);
+        if (result.mutual >= threshold) output.push(result);
+      }
+    } else if (checkType === "overall" && ranked.length >= 2) {
+      const result = makeResult(query, ranked[0][0], ranked[1][0], ranked[0][1], ranked[1][1]);
+      if (result.mutual >= threshold) output.push(result);
+    } else if (checkType === "fragmentation" && ranked.length >= 3) {
+      for (const [page, impressions] of ranked.slice(1)) {
+        const result = makeResult(query, ranked[0][0], page, ranked[0][1], impressions);
+        if (result.mutual >= threshold) output.push(result);
+      }
     }
   }
   return output.sort((a, b) => b.mutual - a.mutual);
 }
 
 function render() {
+  const labels = checkTemplates[activeCheck];
   $("sampleBadge").hidden = !isExample;
+  $("primaryAxis").textContent = `${labels.primary} leads`;
+  $("secondaryAxis").textContent = `${labels.secondary} leads`;
+  $("secondaryPageHead").textContent = labels.secondary;
+  $("primaryImpHead").textContent = `${labels.primary} imp.`;
+  $("secondaryImpHead").textContent = `${labels.secondary} imp.`;
+  $("primaryShareHead").textContent = `${labels.primary} share`;
   $("resultCount").textContent = results.length.toLocaleString();
   $("resultsBody").innerHTML = results.map((row) => `<tr>
     <td>${escapeHtml(row.query)}</td><td>${escapeHtml(row.subpage)}</td>
@@ -193,10 +242,10 @@ function showTooltip(event) {
   const tooltip = $("mapTooltip");
   tooltip.innerHTML = `<strong>${escapeHtml(row.query)}</strong><dl>
     <dt>Common impression score</dt><dd class="common">${(row.commonPercentage * 100).toFixed(1)}%</dd>
-    <dt>Homepage impressions</dt><dd>${row.homepageImpressions.toLocaleString()}</dd>
-    <dt>Sub-page impressions</dt><dd>${row.pageImpressions.toLocaleString()}</dd>
+    <dt>${escapeHtml(checkTemplates[activeCheck].primary)} impressions</dt><dd>${row.homepageImpressions.toLocaleString()}</dd>
+    <dt>${escapeHtml(checkTemplates[activeCheck].secondary)} impressions</dt><dd>${row.pageImpressions.toLocaleString()}</dd>
     <dt>Mutual impressions</dt><dd>${row.mutual.toLocaleString()}</dd>
-    <dt>Sub-page</dt><dd>${escapeHtml(shortUrl(row.subpage))}</dd>
+    <dt>${escapeHtml(checkTemplates[activeCheck].secondary)}</dt><dd>${escapeHtml(shortUrl(row.subpage))}</dd>
   </dl>`;
   tooltip.hidden = false;
   moveTooltip(event);
@@ -235,13 +284,18 @@ function escapeHtml(value) {
 $("analyzeButton").addEventListener("click", async () => {
   const button = $("analyzeButton");
   try {
-    if (!$("homepage").value) throw new Error("Enter the homepage URL.");
+    if (activeCheck === "homepage" && !$("homepage").value) throw new Error("Enter the homepage URL.");
     if (!$("startDate").value || !$("endDate").value) throw new Error("Choose a complete date range.");
     button.disabled = true; button.firstChild.textContent = "Analyzing… ";
+    updateProgress(8, "Preparing Search Console request");
     const rows = await fetchAllRows($("property").value);
+    updateProgress(84, `Running ${checkTemplates[activeCheck].hint.toLowerCase()}`);
     isExample = false;
-    results = analyze(rows, $("homepage").value, Number($("threshold").value));
-    render(); setStatus(`Analyzed ${rows.length.toLocaleString()} query-page rows.`);
+    results = analyze(rows, $("homepage").value, Number($("threshold").value), activeCheck);
+    updateProgress(96, "Rendering results");
+    render();
+    updateProgress(100, `Complete · ${results.length.toLocaleString()} collisions found`);
+    setStatus(`Analyzed ${rows.length.toLocaleString()} query-page rows.`);
   } catch (error) { setStatus(error.message, true); }
   finally { button.disabled = false; button.firstChild.textContent = "Analyze overlap "; }
 });
