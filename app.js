@@ -4,6 +4,28 @@ const $ = (id) => document.getElementById(id);
 
 let accessToken = "";
 let results = [];
+let isExample = true;
+
+const exampleResults = [
+  ["brand running shoes", "/running-shoes/", 1840, 1610],
+  ["lightweight trainers", "/collections/lightweight/", 920, 1380],
+  ["everyday running shoes", "/daily-trainers/", 1260, 740],
+  ["best shoes for jogging", "/guides/jogging-shoes/", 610, 590],
+  ["comfortable sneakers", "/comfort/", 440, 870],
+  ["road running footwear", "/road-running/", 780, 330],
+  ["men's running trainers", "/mens/running/", 260, 710],
+  ["women's running trainers", "/womens/running/", 520, 630],
+  ["cushioned running shoes", "/cushioned-shoes/", 390, 350],
+  ["running shoe shop", "/shop/", 1050, 460],
+].map(([query, path, homepageImpressions, pageImpressions]) => {
+  const mutual = Math.min(homepageImpressions, pageImpressions);
+  const total = homepageImpressions + pageImpressions;
+  return {
+    query, homepage: "https://example.com/", subpage: `https://example.com${path}`,
+    homepageImpressions, pageImpressions, mutual, total,
+    homepageShare: homepageImpressions / total, commonPercentage: (2 * mutual) / total,
+  };
+}).sort((a, b) => b.mutual - a.mutual);
 
 const today = new Date();
 const end = new Date(today); end.setDate(end.getDate() - 3);
@@ -126,6 +148,7 @@ function analyze(rows, homepage, threshold) {
 }
 
 function render() {
+  $("sampleBadge").hidden = !isExample;
   $("resultCount").textContent = results.length.toLocaleString();
   $("resultsBody").innerHTML = results.map((row) => `<tr>
     <td>${escapeHtml(row.query)}</td><td>${escapeHtml(row.subpage)}</td>
@@ -216,6 +239,7 @@ $("analyzeButton").addEventListener("click", async () => {
     if (!$("startDate").value || !$("endDate").value) throw new Error("Choose a complete date range.");
     button.disabled = true; button.firstChild.textContent = "Analyzing… ";
     const rows = await fetchAllRows($("property").value);
+    isExample = false;
     results = analyze(rows, $("homepage").value, Number($("threshold").value));
     render(); setStatus(`Analyzed ${rows.length.toLocaleString()} query-page rows.`);
   } catch (error) { setStatus(error.message, true); }
@@ -230,3 +254,6 @@ $("downloadButton").addEventListener("click", () => {
   const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = "homepage-cannibalization.csv"; link.click();
   URL.revokeObjectURL(link.href);
 });
+
+results = exampleResults;
+render();

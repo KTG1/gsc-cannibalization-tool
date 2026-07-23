@@ -56,6 +56,7 @@ input[type="range"] { min-height: 20px; padding: 0; accent-color: var(--blue); b
 .report { padding: 34px; }
 .report-head { display: flex; justify-content: space-between; gap: 20px; align-items: end; margin-bottom: 28px; }
 h2 { margin: 0; font-size: 27px; letter-spacing: -.04em; font-weight: 500; } h2 strong { color: var(--blue); }
+.sample-badge { margin-left: 8px; padding: 3px 6px; color: var(--ink); background: var(--signal); font-weight: 500; letter-spacing: .04em; }
 .report-actions { display: flex; align-items: center; gap: 10px; }
 .view-switch { display: flex; border: 1px solid var(--ink); padding: 3px; background: var(--paper); }
 .view-button { min-height: 35px; padding: 0 12px; border: 0; background: transparent; cursor: pointer; font: 500 10px "IBM Plex Mono", monospace; text-transform: uppercase; }
